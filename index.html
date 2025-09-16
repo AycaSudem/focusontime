@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ders Çalışma Takip</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
+    }
+    header {
+      padding: 15px;
+      font-size: 1.5em;
+      font-weight: bold;
+      text-align: center;
+      background: rgba(0,0,0,0.08);
+      position: relative;
+    }
+    .temaBtn {
+      position: absolute;
+      right: 12px;
+      top: 10px;
+      font-size: 1.3em;
+      cursor: pointer;
+      opacity: 0.8;
+      padding: 6px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.06);
+    }
+    .screen { display: none; padding: 20px; }
+    .active { display: block; }
+    .btn {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      color: inherit;
+      padding: 10px 16px;
+      margin: 6px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.18);
+      transition: transform 0.12s;
+    }
+    .btn:hover { transform: translateY(-3px); }
+    .timer { font-size: 2.8em; font-weight: bold; margin: 24px 0; text-align: center; }
+    .list { margin-top: 18px; }
+    .day { background: rgba(255,255,255,0.08); padding: 10px; border-radius: 10px; margin-bottom: 10px; }
+    .day h3 { margin: 0 0 6px 0; }
+    .record { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; gap: 10px; }
+    .noteInput { margin-left: 10px; padding: 6px; border-radius: 6px; border: none; min-width:120px; }
+    .deleteBtn { background: #ff4d6d; color: #fff; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+
+    /* Tema renkleri */
+    body.tema-pembe { background: linear-gradient(135deg, #ff9a9e, #fad0c4); color:#222; }
+    body.tema-mor  { background: linear-gradient(135deg, #6a11cb, #2575fc); color:#fff; }
+    body.tema-mavi  { background: linear-gradient(135deg, #43cea2, #185a9d); color:#fff; }
+    body.tema-dark  { background: #121212; color:#eee; }
+  </style>
+</head>
+<body>
+  <header>
+    📚 Ders Çalışma Takip
+    <span class="temaBtn" id="temaBtn" title="Tema" onclick="temaMenusu()">🎨</span>
+  </header>
+
+  <!-- Eğitim Seviyesi -->
+  <div id="egitimSecim" class="screen active">
+    <h2>Eğitim Seviyeni Seç:</h2>
+    <div class="btn" onclick="egitimSec('ortaokul')">🏫 Ortaokul</div>
+    <div class="btn" onclick="egitimSec('lise')">🎓 Lise</div>
+    <div class="btn" onclick="egitimSec('universite')">🏛 Üniversite</div>
+  </div>
+
+  <!-- Lise Alan -->
+  <div id="alanSecim" class="screen">
+    <h2>Lise Alanını Seç:</h2>
+    <div class="btn" onclick="alanSec('sayisal')">📐 Sayısal</div>
+    <div class="btn" onclick="alanSec('esit')">⚖️ Eşit Ağırlık</div>
+    <div class="btn" onclick="alanSec('sozel')">📖 Sözel</div>
+    <div class="btn" onclick="alanSec('dil')">🌍 Dil</div>
+  </div>
+
+  <!-- Ders Seçim -->
+  <div id="dersSecim" class="screen">
+    <h2>Bir Ders Seç:</h2>
+    <div id="dersListesi"></div>
+    <div class="btn" onclick="dersEkle()">➕ Ders Ekle</div>
+    <div class="btn" onclick="goTo('raporlar')">📊 Raporlar</div>
+    <div class="btn" onclick="goTo('egitimSecim')">↩ Eğitim Seç</div>
+  </div>
+
+  <!-- Kronometre -->
+  <div id="kronometre" class="screen">
+    <h2 id="seciliDers"></h2>
+    <div class="timer" id="sure">00:00:00</div>
+    <div style="text-align:center;">
+      <div class="btn" id="toggleBtn" onclick="toggleTimer()">▶ Başlat</div>
+      <div class="btn" onclick="kaydet()">💾 Kaydet</div>
+      <!-- Burayı otomatik kaydetme + navigasyon yapan fonksiyona bağladım -->
+      <div class="btn" onclick="saveAndGoTo('dersSecim')">↩ Dersler</div>
+    </div>
+    <div id="dersKayitlari" class="list"></div>
+  </div>
+
+  <!-- Raporlar -->
+  <div id="raporlar" class="screen">
+    <h2>📊 Çalışma Raporları</h2>
+    <div id="raporListesi" class="list"></div>
+    <div class="btn" onclick="goTo('dersSecim')">↩ Geri</div>
+  </div>
+
+  <!-- Tema Menüsü (overlay ekran gibi) -->
+  <div id="temaMenu" class="screen">
+    <h2>🎨 Tema Seç:</h2>
+    <div class="btn" onclick="temaDegistir('pembe')">💖 Pembe</div>
+    <div class="btn" onclick="temaDegistir('mor')">💜 Mor</div>
+    <div class="btn" onclick="temaDegistir('mavi')">💙 Mavi</div>
+    <div class="btn" onclick="temaDegistir('dark')">🌑 Dark</div>
+    <div class="btn" onclick="temaIptal()">↩ Geri</div>
+  </div>
+
+  <script>
+    /* ---------- Veriler & State ---------- */
+    const dersler = {
+      ortaokul: ["Türkçe","Matematik","Fen Bilimleri","Sosyal Bilgiler","İngilizce"],
+      universite: [],
+      lise: {
+        sayisal: ["TYT Türkçe","TYT Matematik","TYT Sosyal Bilimler","TYT Fen Bilimleri","AYT Matematik","AYT Fizik","AYT Kimya","AYT Biyoloji"],
+        esit: ["TYT Türkçe","TYT Matematik","TYT Sosyal Bilimler","TYT Fen Bilimleri","AYT Matematik","AYT Türk Dili ve Edebiyatı","AYT Tarih","AYT Coğrafya-1"],
+        sozel: ["TYT Türkçe","TYT Matematik","TYT Sosyal Bilimler","TYT Fen Bilimleri","AYT Türk Dili ve Edebiyatı","AYT Tarih","AYT Coğrafya-1","AYT Felsefe","AYT Din Kültürü"],
+        dil: ["TYT Türkçe","TYT Matematik","TYT Sosyal Bilimler","TYT Fen Bilimleri","YDT İngilizce","YDT Almanca","YDT Fransızca"]
+      }
+    };
+
+    let secilenEgitim = null;
+    let secilenDers = null;
+    let startTime = null;       // ms timestamp when started
+    let elapsed = 0;            // ms accumulated when paused
+    let isRunning = false;
+    let interval = null;
+    let kayitlar = JSON.parse(localStorage.getItem("kayitlar")) || []; // {tarih,ders,saniye,not}
+    let currentScreen = "egitimSecim";
+    let screenBeforeTema = null;
+
+    /* ---------- Gezinti ---------- */
+    function goTo(id){
+      document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+      currentScreen = id;
+      // ekran özel işler
+      if(id === "raporlar") raporlariGoster();
+      if(id === "kronometre") dersKayitlariniGoster();
+    }
+
+    /* ---------- Eğitim / Ders ---------- */
+    function egitimSec(secim){
+      secilenEgitim = secim;
+      if(secim === "lise") goTo("alanSecim");
+      else { dersleriListele(dersler[secim]); goTo("dersSecim"); }
+    }
+    function alanSec(alan){ dersleriListele(dersler.lise[alan]); goTo("dersSecim"); }
+
+    function dersleriListele(liste){
+      const dersListesi = document.getElementById("dersListesi");
+      dersListesi.innerHTML = "";
+      liste.forEach(d => {
+        let btn = document.createElement("div");
+        btn.className = "btn";
+        btn.textContent = d;
+        btn.onclick = () => dersSec(d);
+        dersListesi.appendChild(btn);
+      });
+    }
+
+    function dersEkle(){
+      const yeniDers = prompt("Yeni ders adı girin:");
+      if (yeniDers){
+        let btn = document.createElement("div");
+        btn.className = "btn"; btn.textContent = yeniDers;
+        btn.onclick = () => dersSec(yeniDers);
+        document.getElementById("dersListesi").appendChild(btn);
+      }
+    }
+
+    function dersSec(ders){
+      secilenDers = ders;
+      document.getElementById("seciliDers").textContent = `⏱ ${ders}`;
+      goTo("kronometre");
+    }
+
+    /* ---------- Kronometre ---------- */
+    function formatSure(saniye){
+      let h = Math.floor(saniye/3600);
+      let m = Math.floor((saniye % 3600)/60);
+      let sn = saniye % 60;
+      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sn).padStart(2,"0")}`;
+    }
+
+    function updateDisplay(){
+      let now = Date.now();
+      let totalMs = elapsed + (isRunning ? (now - startTime) : 0);
+      document.getElementById("sure").textContent = formatSure(Math.floor(totalMs/1000));
+      saveTimerState();
+    }
+
+    function runTimer(){ clearInterval(interval); interval = setInterval(updateDisplay, 1000); updateDisplay(); }
+    function baslat(){ if(!isRunning){ startTime = Date.now(); isRunning = true; runTimer(); } }
+    function durdur(){ if(isRunning){ elapsed += Date.now() - startTime; isRunning = false; clearInterval(interval); updateDisplay(); } }
+    function resetTimer(){
+      clearInterval(interval);
+      startTime = null;
+      elapsed = 0;
+      isRunning = false;
+      document.getElementById("sure").textContent = "00:00:00";
+      // toggle butonun metnini sıfırla
+      const tb = document.getElementById("toggleBtn");
+      if (tb) tb.textContent = "▶ Başlat";
+      saveTimerState();
+    }
+
+    function toggleTimer(){
+      const btn = document.getElementById("toggleBtn");
+      if(!isRunning){ baslat(); if(btn) btn.textContent = "⏸ Durdur"; }
+      else { durdur(); if(btn) btn.textContent = "▶ Başlat"; }
+    }
+
+    // manuel kaydetme (kronometreyi durdurur, kaydeder ve sıfırlar)
+    function kaydet(){
+      // manuel kaydetme; sadece "elapsed" ms kullanılır (kayıt almadan önce durdurman gerekmez)
+      durdur();
+      if (elapsed > 0 && secilenDers){
+        let tarihObj = new Date();
+        let tarih = tarihObj.toLocaleDateString("tr-TR", { day:"2-digit", month:"2-digit", year:"numeric" });
+        let gun = tarihObj.toLocaleDateString("tr-TR", { weekday:"long" });
+        kayitlar.push({ tarih: `${tarih} ${gun}`, ders: secilenDers, saniye: Math.floor(elapsed/1000), not: "" });
+        localStorage.setItem("kayitlar", JSON.stringify(kayitlar));
+      }
+      resetTimer();
+      dersKayitlariniGoster();
+    }
+
+    // yeni: Dersler'e giderken otomatik kaydetme yapan fonksiyon
+    function saveAndGoTo(dest){
+      // sadece kronometre ekranındayken çalıştırıldığını varsayıyoruz; yine de güvenli kontrol:
+      if (currentScreen === "kronometre"){
+        // eğer süre > 0 veya çalışıyorsa kaydet
+        // kaydet() zaten durdurup resetliyor ve localStorage'a yazıyor
+        kaydet();
+      }
+      goTo(dest);
+    }
+
+    /* ---------- Görünümler: Bugünkü seçili ders kayıtları ---------- */
+    function dersKayitlariniGoster(){
+      let div = document.getElementById("dersKayitlari");
+      div.innerHTML = "";
+      if(!secilenDers) return;
+      let bugun = new Date().toLocaleDateString("tr-TR",{day:"2-digit",month:"2-digit",year:"numeric"});
+      let gun = new Date().toLocaleDateString("tr-TR",{weekday:"long"});
+      let bugunStr = `${bugun} ${gun}`;
+      // filtrelenmiş kayıtlar aynı nesnelere referans ediyor, bu yüzden indexOf ile ana dizindeki indexi bulabiliriz
+      let kayitlarFiltre = kayitlar
+        .map((k, idx) => ({...k, __idx: idx})) // geçici index ekle
+        .filter(k => k.ders === secilenDers && k.tarih === bugunStr);
+
+      if(kayitlarFiltre.length > 0){
+        let h3 = document.createElement("h3");
+        h3.textContent = `📌 Bugünkü ${secilenDers} Kayıtları`;
+        div.appendChild(h3);
+        kayitlarFiltre.forEach((k) => {
+          let originalIndex = k.__idx;
+          let p = document.createElement("div");
+          p.className = "record";
+          // onchange ile doğru kaydın index'ini gönderiyoruz
+          p.innerHTML = `⏱ ${formatSure(k.saniye)} <input type="text" class="noteInput" placeholder="Not ekle..." value="${k.not || ''}" onchange="noteDegisti(${originalIndex}, this.value)">`;
+          div.appendChild(p);
+        });
+      } else {
+        let p = document.createElement("div");
+        p.style.opacity = "0.9";
+        p.style.marginTop = "6px";
+        p.textContent = "Bugün bu derse ait kayıt yok.";
+        div.appendChild(p);
+      }
+    }
+
+    function noteDegisti(originalIndex, val){
+      if (typeof originalIndex === "number" && kayitlar[originalIndex]){
+        kayitlar[originalIndex].not = val;
+        localStorage.setItem("kayitlar", JSON.stringify(kayitlar));
+      }
+    }
+
+    /* ---------- Raporlama ---------- */
+    function raporlariGoster(){
+      let raporDiv = document.getElementById("raporListesi");
+      raporDiv.innerHTML = "";
+      let gunluk = {};
+      kayitlar.forEach((k, index) => {
+        if(!gunluk[k.tarih]) gunluk[k.tarih] = {};
+        if(!gunluk[k.tarih][k.ders]) gunluk[k.tarih][k.ders] = { toplam:0, kayitlar:[] };
+        gunluk[k.tarih][k.ders].toplam += k.saniye;
+        gunluk[k.tarih][k.ders].kayitlar.push({ saniye: k.saniye, not: k.not, index });
+      });
+      for (let tarih in gunluk){
+        let dayDiv = document.createElement("div"); dayDiv.className = "day";
+        let h3 = document.createElement("h3"); h3.textContent = tarih; dayDiv.appendChild(h3);
+        let ul = document.createElement("ul"); let gunlukToplam = 0;
+        for (let ders in gunluk[tarih]){
+          let dersObj = gunluk[tarih][ders]; gunlukToplam += dersObj.toplam;
+          let li = document.createElement("li"); li.textContent = `${ders}: ${formatSure(dersObj.toplam)}`; ul.appendChild(li);
+          dersObj.kayitlar.forEach(k => {
+            let subDiv = document.createElement("div"); subDiv.className = "record";
+            subDiv.innerHTML = `<span>⏱ ${formatSure(k.saniye)} | 📝 ${k.not || "Not yok"}</span>`;
+            let btnSil = document.createElement("button"); btnSil.textContent = "Sil"; btnSil.className = "deleteBtn";
+            btnSil.onclick = () => {
+              if (confirm("❗ Bu kaydı silmek istediğinize emin misiniz?")) {
+                kayitlar.splice(k.index, 1);
+                localStorage.setItem("kayitlar", JSON.stringify(kayitlar));
+                raporlariGoster();
+              }
+            };
+            subDiv.appendChild(btnSil);
+            ul.appendChild(subDiv);
+          });
+        }
+        let toplamLi = document.createElement("li"); toplamLi.style.fontWeight = "bold"; toplamLi.textContent = `Günlük Toplam: ${formatSure(gunlukToplam)}`; ul.appendChild(toplamLi);
+        dayDiv.appendChild(ul); raporDiv.appendChild(dayDiv);
+      }
+      if (Object.keys(gunluk).length === 0){
+        raporDiv.innerHTML = "<div style='opacity:0.9'>Henüz kayıt yok.</div>";
+      }
+    }
+
+    /* ---------- Timer state kaydetme ---------- */
+    function saveTimerState(){
+      // startTime stays null or ms; elapsed in ms; isRunning boolean; secilenDers string
+      localStorage.setItem("timerState", JSON.stringify({ startTime, elapsed, isRunning, secilenDers }));
+    }
+
+    /* ---------- Tema menüsü yönetimi ---------- */
+    function temaMenusu(){
+      // tema menüsüne gelmeden önce hangi ekranda olduğumuzu kaydet
+      screenBeforeTema = currentScreen;
+      goTo("temaMenu");
+    }
+    function temaIptal(){
+      // menü iptal => önceki ekrana dön
+      if (screenBeforeTema) { goTo(screenBeforeTema); screenBeforeTema = null; }
+      else goTo("egitimSecim");
+    }
+    function applyTema(tema){
+      document.body.className = "tema-" + tema;
+      localStorage.setItem("tema", tema);
+    }
+    function temaDegistir(tema){
+      applyTema(tema);
+      // tema seçildikten sonra kullanıcıyı önceki ekrana döndür
+      if (screenBeforeTema) { goTo(screenBeforeTema); screenBeforeTema = null; }
+      else goTo("egitimSecim");
+    }
+
+    /* ---------- Başlangıç (load) ---------- */
+    window.onload = () => {
+      // önceki kronometre durumu yükle
+      const saved = JSON.parse(localStorage.getItem("timerState"));
+      if (saved){
+        startTime = saved.startTime;
+        elapsed = saved.elapsed || 0;
+        isRunning = saved.isRunning || false;
+        secilenDers = saved.secilenDers || null;
+        if (secilenDers) document.getElementById("seciliDers").textContent = `⏱ ${secilenDers}`;
+        if (isRunning){
+          // startTime kaydedilmiş ms ise, timer'ı çalıştır
+          runTimer();
+          document.getElementById("toggleBtn").textContent = "⏸ Durdur";
+        } else {
+          updateDisplay();
+        }
+      } else {
+        updateDisplay();
+      }
+      // tema uygulama (navigation yapma yok)
+      let kayitliTema = localStorage.getItem("tema") || "pembe";
+      applyTema(kayitliTema);
+      // istersen önceki eğitim seçimi durumunu da buradan yükleyebilirsin
+    };
+  </script>
+</body>
+</html>
